@@ -44,9 +44,41 @@ XMAS_validator <- function(index, size=25){
 }
 
 results <- purrr::map_chr(26:length(numbers), XMAS_validator, size=25)
-get_value(which(results == "invalid")+25 ) # 387360330 too low.
+value <- get_value(which(results == "invalid")+25 ) # 387360330 too low.
 ## I forgot to add the offset! 
 
 
 ## Part 2 ----- 
 
+# you must find a contiguous set of at least two numbers in your list which sum
+# to the invalid number from step 1.
+
+### So I should create some sort of window function that reads in the 
+### range of values, sums them and checks against the value.
+### Once found, get the lowest and highest number of range.=encryption weakness
+### I can reuse a lot of the functions from before!
+
+## I could have used this function before...
+sequence_creator <- function(size=2){
+    (size+1):length(numbers)
+}
+# test
+# min(sequence_creator(25)) == 26
+
+encryption_weakness <- function(size=2){
+   iterators <- sequence_creator(size)  
+   sums <- purrr::map_dbl(iterators, ~sum(get_source_data(.x, size = size)))
+   valid <- iterators[which(sums == value)]# defined above
+   if(length(valid)>0){
+       cat("index=", valid, " size=",size,"\n")
+       sum(range(get_source_data(valid,size = size)))
+   }else{
+       0
+   }
+}
+
+### Maybe I could filter out some value in a smart way here?
+### I don't care enough right now, I think 2-50 is a reasonable range.
+
+result <- purrr::map_dbl(2:50, encryption_weakness) 
+result[result>0]
