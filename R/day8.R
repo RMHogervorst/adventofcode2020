@@ -308,7 +308,6 @@ Fixed_Handheld <- R6Class("Handheld",
                               terminated = function(){
                                   private$terminus
                               }
-                    
                           )
 )
 
