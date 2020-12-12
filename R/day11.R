@@ -124,8 +124,9 @@ loop_to_no_change <- function(matrix, debug=FALSE){
         matrix <- step_seats(old_matrix)
         identical <- sum(matrix != old_matrix)==0
         loop <- loop +1
-        if(debug){
+        
             cat("loop ", loop, " seats occupied: ", sum(matrix=="#"), "\n")
+        if(debug){
             cat("old_matrix[3,2:6]: ",old_matrix[3,2:6], "\n")
             cat("new_matrix[3,2:6]: ",matrix[3,2:6], "\n")
         }
@@ -134,3 +135,85 @@ loop_to_no_change <- function(matrix, debug=FALSE){
     matrix
 }
 result_part_1 <- loop_to_no_change(seat_matrix)
+
+
+### part 2
+### first seat, so ignore all the dots. 
+### and 5 or more
+example <- matrix(unlist(strsplit("L.LL.LL.LLLLLLLLL.LLL.L.L..L..LLLL.LL.LLL.LL.LL.LLL.LLLLL.LL..L.L.....LLLLLLLLLLL.LLLLLL.LL.LLLLL.LL","")),ncol=10, byrow=TRUE)
+round1  <- matrix(unlist(strsplit("#.##.##.#########.###.#.#..#..####.##.###.##.##.###.#####.##..#.#.....###########.######.##.#####.##","")),ncol=10, byrow=TRUE)
+round2  <- matrix(unlist(strsplit("#.LL.LL.L##LLLLLL.LLL.L.L..L..LLLL.LL.LLL.LL.LL.LLL.LLLLL.LL..L.L.....LLLLLLLLL##.LLLLLL.L#.LLLLL.L#","")),ncol=10, byrow=TRUE)
+
+sum(step_seats(example) != round1)
+sum(step_seats(round1) != round2)
+
+check_vicinity <- function(row, column, matrix =seat_matrix){
+    width = NCOL(matrix)
+    height= NROW(matrix)
+    rows_to_check = row +all_around$row
+    cols_to_check = column +all_around$col
+    valid_rows <- rows_to_check >0 & rows_to_check <=height
+    valid_cols <- cols_to_check >0 & cols_to_check <= width
+    valid <- valid_rows & valid_cols
+    res <- data.frame(
+        x = all_around$row[valid],
+        y = all_around$col[valid],
+        values = purrr::map2_chr(
+            .x = rows_to_check[valid],
+            .y = cols_to_check[valid],
+            .f = get_value, matrix=matrix
+        )
+        
+    )
+    
+}
+### a recursive function that moves in the same direction, 
+### checks coordinates, retrieves the value and if "." calls itself again.
+look_in_direction <- function(row, column, matrix, direction=(1:8)){
+    width = NCOL(matrix)
+    height= NROW(matrix)
+    newrow = row + all_around$row[direction]
+    newcolumn = column +all_around$col[direction]
+    if(newrow >0 & newrow <= height & newcolumn >0 & newcolumn <= width){
+        value = get_value(newrow, newcolumn, matrix)
+        if(value =="."){
+            look_in_direction(newrow, newcolumn, matrix, direction=direction)
+        }else{
+            value
+        }
+    }else{
+        "."
+    }
+    
+}
+# look_in_direction(1,1,example, 2) == "L"
+# look_in_direction(1,1,example, 1) == "L"
+
+# returns vector of 8 
+look_around <- function(row, column, matrix){
+    purrr::map_chr(1:8, ~look_in_direction(row, column, matrix, .x))
+}
+# length(look_around(1,1,example))==8
+# length(look_around(2,2,example))==8
+# sum(look_around(2,2,example)==".")==1
+
+apply_action <-function(row, column, matrix =seat_matrix){
+    current  <- get_value(row, column, matrix)
+    # (.) remains
+    result <- "."
+    if(current != "."){
+        result <- "L"
+        around <- look_around(row, column, matrix)
+        occupied <- sum(around == "#")
+        # (L) and all around  no occupied seats become (#)
+        # (#) and (4 of all positions are #)  seat become (L) 
+        if(current == 'L' & occupied ==0){
+            result <- "#"
+        }
+        if(current == "#" & occupied < 5){
+            result <- "#"
+        }
+    }
+    result
+}
+
