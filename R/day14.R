@@ -69,13 +69,13 @@ extract_number <- function(line){
 
 extract_mem_adress <- function(line){
     stringr::str_extract(line, "mem\\[[0-9]{1,5}\\]") %>% 
-        stringr::str_extract('[0-9]{1,5}') %>% 
-        paste0('m',.)
+        stringr::str_extract('[0-9]{1,5}')
+        
 }
 set_to_memory <- function(masknumber, line_seq){
     mask <- extract_mask(ferry_init_program[masknumber])
     for (line in line_seq) {
-        mem_adress <- extract_mem_adress(ferry_init_program[line])
+        mem_adress <- paste0('m',extract_mem_adress(ferry_init_program[line]))
         bin_vec = to_binary_vec(extract_number(ferry_init_program[line]))
         bin_vecmasked <- apply_bitmask(bin_vec, mask)
         ## and assign it to the memory adress.
@@ -91,3 +91,75 @@ for (step in seq_len(length(start))) {
 options(digits=20)
 sum(purrr::map_dbl(all_memory_adresses, binary_vec_to_integer))
 
+### part 2 -----
+# Of course there is always a catch.
+# 
+all_memory_adresses2 <- list()
+
+apply_bitmask2 <- function(vec, mask){
+    stopifnot(length(vec)==36)
+    stopifnot(length(mask)==36)
+    vec[mask ==1] <- 1L
+    vecs <- matrix(vec, nrow = 1, byrow = TRUE)
+    ### the dumb way, growing a matrix
+    for (x in which(mask == 'X')) {
+        vecs_row = NROW(vecs)
+        vecs <- rbind(vecs, vecs)
+        vecs[,x]<- 0
+        vecs[1:vecs_row, x] <- 0 
+        
+    }
+    vecs
+}
+apply_bitmask2(
+    vec = to_binary_vec(42), 
+    mask = make_vec_from_string("000000000000000000000000000000X1001X"))
+
+creator <- function(nrow, nr){
+    stopifnot(nrow %% 2 ==0)
+    stopifnot(nrow/2 >= nr)
+    x <- nrow / (2^nr)
+    y <- nrow / (2*x)
+    rep(c(rep(1, x), rep(0,x)),y)
+}
+
+## never growing the matrix
+apply_bitmask3 <- function(vec, mask){
+    stopifnot(length(vec)==36)
+    stopifnot(length(mask)==36)
+    vec[mask =="1"] <- 1L
+    mask_positions <- which(mask == 'X')
+    ### first make the matrix
+    vecs <- matrix(vec, ncol=36, byrow = TRUE, nrow = 2^length(mask_positions))
+    ## then modify in place
+    for (x in mask_positions) {
+        vecs[,x] <- creator(NROW(vecs), nr = which(mask_positions == x))
+    }
+    vecs
+}
+
+
+set_to_memory_v2 <- function(masknumber, line_seq){
+    mask <- extract_mask(ferry_init_program[masknumber])
+    for (line in line_seq) {
+        mem_adress <- to_binary_vec(as.integer(extract_mem_adress(ferry_init_program[line])))
+        tmp <- apply_bitmask3(bin_vec, mask)
+        # turn matrix in vectors (every row) and make them integer again.
+        adresses <- apply(tmp, 1, binary_vec_to_integer)
+        #bin_vec = to_binary_vec(extract_number(ferry_init_program[line]))
+        number <- extract_number(ferry_init_program[line])
+        ## and assign it to the memory adressses.
+        for (adress in adresses) {
+            all_memory_adresses2[[paste0("m",adress)]] <<- number
+        }
+    }
+}
+
+
+start <- (1:length(ferry_init_program))[masks]
+end <- c(start -1, length(ferry_init_program))
+end <- end[end !=0]
+for (step in seq_len(length(start))) {
+    set_to_memory_v2(start[step], ((start[step])+1):end[step])
+}
+sum(purrr::map_dbl(all_memory_adresses2, 1)) # 1435625767696 too low
