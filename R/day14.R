@@ -1,0 +1,93 @@
+# ---- day 14 Docking Data ----
+# part 1 ----
+# a line like mem[8] = 11 would write the value 11 to memory address 8.
+#
+# The bitmask is always given as a string of 36 bits, written with the most
+# significant bit (representing 2^35) on the left and the least significant bit
+# (2^0, that is, the 1s bit) on the right. The current bitmask is applied to
+# values immediately before they are written to memory: a 0 or 1 overwrites the
+# corresponding bit in the value, while an X leaves the bit in the value
+# unchanged.
+#
+# intToBits() should work perfectly, but does only 32 bits
+# and I need a 36 bit with the least significant bit right.
+# I also need to apply a mask to the values
+# I think representing values as vector of length 64 is easiest.
+# I might make an S3 printing method too!
+### https://stackoverflow.com/a/26346350 
+### and https://www.rapidtables.com/convert/number/decimal-to-binary.html
+library(magrittr)
+to_binary_vec <- function(int){
+    vec <- rep(0L, 36)
+    i <- 0
+    while (int >0) {
+        vec[(36-i)] <- as.integer(int %% 2)
+        int <- int %/% 2
+        i <- i +1
+    }
+    class(vec) <- "bitrepresentation"
+    vec
+}
+
+binary_vec_to_integer <- function(vec){
+    stopifnot(length(vec)==36)
+    sum(vec * 2^(35:0))
+}
+
+print.bitrepresentation <- function(x){
+   cat("(",binary_vec_to_integer(x),") ", as.integer(x))
+}
+apply_bitmask <- function(vec, mask){
+    stopifnot(length(vec)==36)
+    stopifnot(length(mask)==36)
+    vec[mask ==1] <- 1L
+    vec[mask ==0] <- 0L
+    vec
+}
+make_vec_from_string <- function(line){unlist(stringr::str_split(line,""))}
+# 
+# to_binary_vec(11)
+# to_binary_vec(101)
+# mask1 <- unlist(strsplit('XXXXXXXXXXXXXXXXXXXXXXXXXXXXX1XXXX0X',""))
+# apply_bitmask(to_binary_vec(11), mask1) # is indeed 73
+# apply_bitmask(to_binary_vec(101), mask1) # is indeed 101
+# apply_bitmask(to_binary_vec(0), mask1) # is inded 64
+
+### parse the inputdata
+ferry_init_program <- readLines("data/day14.txt")
+masks <- stringr::str_detect(ferry_init_program,"^mask")
+#all_mems <- stringr::str_extract_all(ferry_init_program, "mem\\[[0-9]{1,5}\\]") %>% stringr::str_extract("[0-9]{1,5}")
+all_memory_adresses <- list()
+
+extract_mask <- function(line){
+    stringr::str_remove(line,"mask = ") %>% 
+        make_vec_from_string()
+}
+extract_number <- function(line){
+    as.integer(stringr::str_extract(line,"[0-9]+$"))
+}
+
+extract_mem_adress <- function(line){
+    stringr::str_extract(line, "mem\\[[0-9]{1,5}\\]") %>% 
+        stringr::str_extract('[0-9]{1,5}') %>% 
+        paste0('m',.)
+}
+set_to_memory <- function(masknumber, line_seq){
+    mask <- extract_mask(ferry_init_program[masknumber])
+    for (line in line_seq) {
+        mem_adress <- extract_mem_adress(ferry_init_program[line])
+        bin_vec = to_binary_vec(extract_number(ferry_init_program[line]))
+        bin_vecmasked <- apply_bitmask(bin_vec, mask)
+        ## and assign it to the memory adress.
+        all_memory_adresses[[mem_adress]] <<- bin_vecmasked
+    }
+}
+start <- (1:length(ferry_init_program))[masks]
+end <- c(start -1, length(ferry_init_program))
+end <- end[end !=0]
+for (step in seq_len(length(start))) {
+    set_to_memory(start[step], ((start[step])+1):end[step])
+}
+options(digits=20)
+sum(purrr::map_dbl(all_memory_adresses, binary_vec_to_integer))
+
