@@ -106,9 +106,9 @@ count_actives_neighborhood <- function(x,y,z, df_values){
         summarize(actives = sum(active, na.rm = TRUE)) %>% 
         pull(actives)
 }
-count_actives_neighborhood(previous_step$x[[1]], previous_step$y[[1]], previous_step$z[[1]], actives) ==1
-count_actives_neighborhood(1,1,-1, actives)
-neighborhood(previous_step$x[[1]], previous_step$y[[1]], previous_step$z[[1]])
+# count_actives_neighborhood(previous_step$x[[1]], previous_step$y[[1]], previous_step$z[[1]], actives) ==1
+# count_actives_neighborhood(1,1,-1, actives)
+# neighborhood(previous_step$x[[1]], previous_step$y[[1]], previous_step$z[[1]])
 
 
 do_step <- function(previous_step){
@@ -141,11 +141,11 @@ test_step1 <- tribble(
     3,2,1,
     2,3,1
 )
-test_step1 %>% print_cubes()
-tmp1 <- active_cubes_test %>% do_step()
-# it works! but, it shifts!
-
-tmp1 %>% do_step() %>% print_cubes()
+# test_step1 %>% print_cubes()
+# tmp1 <- active_cubes_test %>% do_step()
+# # it works! but, it shifts!
+# 
+# tmp1 %>% do_step() %>% print_cubes()
 
 active_cubes_test %>% 
     do_step() %>% # 1
@@ -194,4 +194,123 @@ values %>%
     do_step() %>% #5
     do_step() %>% #6
     nrow()
+
+
+### part 2 another dimension!
+### 
+active_cubes_test2 <- data.frame(
+    x=c(2,3,1,2,3),
+    y=c(1,2,3,3,3),
+    z=c(0,0,0,0,0),
+    w =0
+)
+
+# retrieve_neighbors
+neighborhood2 <- function(x,y,z,w){
+    steps <- c(-1,0,1)
+    neighbors <- expand.grid(x=steps, y=steps, z=steps, w=steps)
+    neighbors <- neighbors[!(neighbors$x==0 & neighbors$y==0 & neighbors$z==0 & neighbors$w ==0),]
+    neighbors$x <- neighbors$x + x
+    neighbors$y <- neighbors$y + y
+    neighbors$z <- neighbors$z + z
+    neighbors$w <- neighbors$w + w
+    rownames(neighbors) <- NULL
+    stopifnot(nrow(neighbors)==80)
+    neighbors
+}
+
+#neighborhood2(x=1,y=2,z=3,w=0) # includes 2,2,2 &0,2,3
+
+print_cubes2 <- function(df){
+    x_ = range(df$x)
+    y_ = range(df$y)
+    z_ = range(df$z)
+    w_ = range(df$w)
+    for(w in seq(w_[1], w_[2])){
+        for(z in seq(z_[1], z_[2])){
+            cat("z=",z," w=",w,  "\n")
+            for( y in seq(y_[1],y_[2])){
+                for (x in seq(x_[1],x_[2])) {
+                    token <- "."
+                    res <- sum(df$x == x & df$y == y & df$z == z& df$w == w)
+                    if(res==1){token <- "#"}
+                    cat(token)
+                }
+                cat("\n")
+            }
+        }
+    }
+}
+#print_cubes2(active_cubes_test2)
+
+
+
+places_to_check2 <- function(cubes){
+    x_ = range(cubes$x)
+    y_ = range(cubes$y)
+    z_ = range(cubes$z)
+    w_ = range(cubes$w)
+    expand.grid(
+        x = seq(x_[1]-1, x_[2]+1),
+        y = seq(y_[1]-1, y_[2]+1),
+        z = seq(z_[1]-1, z_[2]+1),
+        w = seq(w_[1]-1, w_[2]+1)
+    )
+}
+
+count_actives_neighborhood2 <- function(x,y,z,w, df_values){
+    nb <-neighborhood2(x,y,z,w)
+    nb %>% 
+        left_join(df_values, by = c("x", "y", "z","w")) %>% 
+        summarize(actives = sum(active, na.rm = TRUE)) %>% 
+        pull(actives)
+}
+
+
+
+do_step2 <- function(previous_step){
+    #cat('steppin\n')
+    coordinates <- places_to_check2(previous_step)
+    actives <- previous_step %>% mutate(active=1)
+    coordinates$nbs <- purrr::pmap_dbl(
+        list(x=coordinates$x,y=coordinates$y, z=coordinates$z,w=coordinates$w), 
+        count_actives_neighborhood2, 
+        df_values=actives)
+    coordinates <- coordinates %>% left_join(actives, by=c("x","y","z","w"))
+    # apply the rules of the cycle
+    coordinates$next_round <- 0
+    active_cds <- !is.na(coordinates$active)
+    coordinates$next_round[active_cds] <- as.integer(coordinates$nbs[active_cds] %in% c(2,3))
+    coordinates$next_round[!active_cds] <- as.integer(coordinates$nbs[!active_cds] ==3)
+    # return only the active cases
+    coordinates[coordinates$next_round ==1,c("x","y","z","w")]
+}
+
+
+
+active_cubes_test2 %>% 
+    do_step2() %>% # 1
+    do_step2() %>% # 2
+    do_step2() %>% # 3
+    do_step2() %>% # 4
+    do_step2() %>% # 5
+    do_step2() %>% # 6
+    nrow() ==848 ### takes quite some time!
+    #print_cubes2()
+
+system.time(
+    (answer <- values %>% 
+        as.data.frame() %>% 
+        rename(x=col,y=row) %>% 
+        mutate(z=0, w=0) %>% 
+        do_step2() %>% # 1
+        do_step2() %>% # 2
+        do_step2() %>% # 3
+        do_step2() %>% # 4
+        do_step2() %>% # 5
+        do_step2() %>% # 6
+        nrow() 
+     )
+)# 611.591 seconds.
+
     
